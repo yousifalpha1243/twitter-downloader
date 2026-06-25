@@ -1,9 +1,22 @@
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const app = express();
+
+// yt-dlp install on startup
+try {
+  execSync('yt-dlp --version');
+} catch(e) {
+  try {
+    console.log('Installing yt-dlp...');
+    execSync('/usr/bin/pip3 install yt-dlp --break-system-packages', { stdio: 'inherit' });
+    console.log('yt-dlp installed!');
+  } catch(e2) {
+    console.log('yt-dlp install failed:', e2.message);
+  }
+}
 
 const COOKIES = path.join(__dirname, 'cookies.txt');
 const TEMP = path.join(__dirname, 'temp');
