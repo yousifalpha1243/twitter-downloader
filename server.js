@@ -18,7 +18,7 @@ app.get('/info', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
   try {
-    const info = await ytDlpWrap.getVideoInfo(url);
+    const info = await ytDlpWrap.getVideoInfo([url, '--cookies', path.join(__dirname, 'cookies.txt')]);
     const qualities = [];
     const seen = new Set();
     if (info.formats) {
@@ -53,7 +53,7 @@ app.get('/video', async (req, res) => {
   const filepath = path.join(TEMP, filename);
   res.json({ status: 'processing', file: filename });
   try {
-    await ytDlpWrap.execPromise([url, '-f', format, '-o', filepath]);
+    await ytDlpWrap.execPromise([url, '-f', format, '-o', filepath, '--cookies', path.join(__dirname, 'cookies.txt')]);
   } catch(e) {
     console.error('Download error:', e);
   }
@@ -84,7 +84,7 @@ app.get('/mp3', async (req, res) => {
   const filepath = path.join(TEMP, filename);
   res.json({ status: 'processing', file: filename });
   try {
-    await ytDlpWrap.execPromise([url, '-f', 'bestaudio', '-o', filepath]);
+    await ytDlpWrap.execPromise([url, '-f', 'bestaudio', '-o', filepath, '--cookies', path.join(__dirname, 'cookies.txt')]);
   } catch(e) {
     console.error('MP3 error:', e);
   }
