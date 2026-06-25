@@ -78,26 +78,24 @@ app.get('/info', async (req, res) => {
 app.get('/video', (req, res) => {
   const format = req.query.format;
   if (!format) return res.status(400).send('No format');
-  res.json({ status: 'processing', file: 'tw_' + format });
+  const encoded = encodeURIComponent(format);
+  res.json({ status: 'processing', file: encoded });
 });
 
 app.get('/status', (req, res) => {
   const file = req.query.file;
-  if (file && file.startsWith('tw_')) {
-    res.json({ ready: true, url: '/file/' + file });
+  if (file) {
+    res.json({ ready: true, url: '/redirect?v=' + file });
   } else {
     res.json({ ready: false });
   }
 });
 
-app.get('/file/:filename', (req, res) => {
-  const filename = req.params.filename;
-  if (filename.startsWith('tw_')) {
-    const videoUrl = decodeURIComponent(filename.slice(3));
-    res.redirect(videoUrl);
-  } else {
-    res.status(404).send('Not found');
-  }
+app.get('/redirect', (req, res) => {
+  const v = req.query.v;
+  if (!v) return res.status(400).send('No URL');
+  const videoUrl = decodeURIComponent(v);
+  res.redirect(videoUrl);
 });
 
 app.get('/mp3', async (req, res) => {
@@ -112,7 +110,8 @@ app.get('/mp3', async (req, res) => {
       const variants = data.mediaDetails[0].video_info.variants
         .sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0));
       const audioUrl = variants[0].url;
-      res.json({ status: 'processing', file: 'tw_' + encodeURIComponent(audioUrl) });
+      const encoded = encodeURIComponent(audioUrl);
+      res.json({ status: 'processing', file: encoded });
     } else {
       res.status(500).json({ error: 'No audio found' });
     }
@@ -122,13 +121,9 @@ app.get('/mp3', async (req, res) => {
 });
 
 app.get('/mp3file/:filename', (req, res) => {
-  const filename = req.params.filename;
-  if (filename.startsWith('tw_')) {
-    const videoUrl = decodeURIComponent(filename.slice(3));
-    res.redirect(videoUrl);
-  } else {
-    res.status(404).send('Not found');
-  }
+  const v = req.query.v || req.params.filename;
+  const audioUrl = decodeURIComponent(v);
+  res.redirect(audioUrl);
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
