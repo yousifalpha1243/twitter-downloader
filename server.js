@@ -1,14 +1,25 @@
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const app = express();
 
-const YT_DLP = 'C:\\Users\\SKL\\AppData\\Roaming\\Python\\Python314\\Scripts\\yt-dlp.exe';
+// yt-dlp install on startup
+try {
+  execSync('yt-dlp --version');
+} catch(e) {
+  try {
+    console.log('Installing yt-dlp...');
+    execSync('/usr/bin/pip3 install yt-dlp --break-system-packages', { stdio: 'inherit' });
+    console.log('yt-dlp installed!');
+  } catch(e2) {
+    console.log('yt-dlp install failed:', e2.message);
+  }
+}
+
 const COOKIES = path.join(__dirname, 'cookies.txt');
 const TEMP = path.join(__dirname, 'temp');
-
 if (!fs.existsSync(TEMP)) fs.mkdirSync(TEMP);
 
 app.use(cors());
@@ -18,7 +29,8 @@ app.use(express.static('public'));
 app.get('/info', (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
-  exec(`"${YT_DLP}" --cookies "${COOKIES}" --dump-json "${url}"`, (error, stdout) => {
+  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
+  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
     if (error) return res.status(500).json({ error: 'Could not fetch video.' });
     try {
       const info = JSON.parse(stdout);
@@ -26,7 +38,7 @@ app.get('/info', (req, res) => {
       const seen = new Set();
       if (info.formats) {
         info.formats.forEach(f => {
-          if (f.ext === 'mp4' && f.height && !seen.has(f.height)) {
+          if (f.height && !seen.has(f.height)) {
             seen.add(f.height);
             qualities.push({
               quality: f.height + 'p',
@@ -53,13 +65,11 @@ app.get('/video', (req, res) => {
   const url = req.query.url;
   const format = req.query.format || 'best';
   if (!url) return res.status(400).send('No URL');
-
   const filename = 'video_' + Date.now() + '.mp4';
   const filepath = path.join(TEMP, filename);
-
+  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-
-  exec(`"${YT_DLP}" --cookies "${COOKIES}" -f ${format} -o "${filepath}" "${url}"`, (error) => {
+  exec(`yt-dlp ${cookieFlag} -f ${format} -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
     if (error) console.error('Download error:', error);
   });
 });
@@ -79,9 +89,7 @@ app.get('/file/:filename', (req, res) => {
   if (!fs.existsSync(filepath)) return res.status(404).send('Not found');
   res.setHeader('Content-Disposition', 'attachment; filename="video.mp4"');
   res.sendFile(filepath);
-  setTimeout(() => {
-    try { fs.unlinkSync(filepath); } catch(e) {}
-  }, 60000);
+  setTimeout(() => { try { fs.unlinkSync(filepath); } catch(e) {} }, 60000);
 });
 
 app.get('/mp3', (req, res) => {
@@ -89,8 +97,9 @@ app.get('/mp3', (req, res) => {
   if (!url) return res.status(400).send('No URL');
   const filename = 'audio_' + Date.now() + '.mp3';
   const filepath = path.join(TEMP, filename);
+  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-  exec(`"${YT_DLP}" --cookies "${COOKIES}" -f bestaudio -o "${filepath}" "${url}"`, (error) => {
+  exec(`yt-dlp ${cookieFlag} -f bestaudio -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
     if (error) console.error('MP3 error:', error);
   });
 });
@@ -102,4 +111,4 @@ app.get('/mp3file/:filename', (req, res) => {
   res.sendFile(filepath);
 });
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
