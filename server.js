@@ -3,19 +3,42 @@ const cors = require('cors');
 const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const app = express();
 
-// yt-dlp install on startup
-try {
-  execSync('yt-dlp --version');
-} catch(e) {
-  try {
-    console.log('Installing yt-dlp...');
-    execSync('/usr/bin/pip3 install yt-dlp --break-system-packages', { stdio: 'inherit' });
-    console.log('yt-dlp installed!');
-  } catch(e2) {
-    console.log('yt-dlp install failed:', e2.message);
+const YT_DLP_PATH = '/app/yt-dlp';
+
+function installYtDlp(callback) {
+  if (fs.existsSync(YT_DLP_PATH)) {
+    console.log('yt-dlp already exists');
+    return callback();
   }
+  console.log('Downloading yt-dlp...');
+  const file = fs.createWriteStream(YT_DLP_PATH);
+  https.get('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp', function(response) {
+    if (response.statusCode === 302 || response.statusCode === 301) {
+      https.get(response.headers.location, function(res2) {
+        res2.pipe(file);
+        file.on('finish', function() {
+          file.close();
+          execSync(`chmod +x ${YT_DLP_PATH}`);
+          console.log('yt-dlp downloaded!');
+          callback();
+        });
+      });
+    } else {
+      response.pipe(file);
+      file.on('finish', function() {
+        file.close();
+        execSync(`chmod +x ${YT_DLP_PATH}`);
+        console.log('yt-dlp downloaded!');
+        callback();
+      });
+    }
+  }).on('error', function(err) {
+    console.error('Download failed:', err.message);
+    callback();
+  });
 }
 
 const COOKIES = path.join(__dirname, 'cookies.txt');
@@ -30,7 +53,7 @@ app.get('/info', (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
-  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+  exec(`${YT_DLP_PATH} ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
     if (error) return res.status(500).json({ error: 'Could not fetch video.' });
     try {
       const info = JSON.parse(stdout);
@@ -69,7 +92,7 @@ app.get('/video', (req, res) => {
   const filepath = path.join(TEMP, filename);
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-  exec(`yt-dlp ${cookieFlag} -f ${format} -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
+  exec(`${YT_DLP_PATH} ${cookieFlag} -f ${format} -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
     if (error) console.error('Download error:', error);
   });
 });
@@ -99,7 +122,7 @@ app.get('/mp3', (req, res) => {
   const filepath = path.join(TEMP, filename);
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-  exec(`yt-dlp ${cookieFlag} -f bestaudio -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
+  exec(`${YT_DLP_PATH} ${cookieFlag} -f bestaudio -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
     if (error) console.error('MP3 error:', error);
   });
 });
@@ -111,4 +134,6 @@ app.get('/mp3file/:filename', (req, res) => {
   res.sendFile(filepath);
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
+installYtDlp(function() {
+  app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
+});
