@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
-const YT_DLP = 'C:\\Users\\SKL\\AppData\\Roaming\\Python\\Python314\\Scripts\\yt-dlp.exe';
+const YT_DLP = process.env.YT_DLP_PATH || 'yt-dlp';
 const COOKIES = path.join(__dirname, 'cookies.txt');
 const TEMP = path.join(__dirname, 'temp');
 
