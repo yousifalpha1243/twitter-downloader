@@ -47,7 +47,7 @@ app.get('/info', (req, res) => {
       const seen = new Set();
       if (info.formats) {
         info.formats.forEach(f => {
-          if (f.ext === 'mp4' && f.height && !seen.has(f.height)) {
+          if (f.height && !seen.has(f.height)) {
             seen.add(f.height);
             qualities.push({
               quality: f.height + 'p',
