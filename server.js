@@ -17,7 +17,7 @@ app.get('/info', (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
-  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 60000 }, (error, stdout) => {
+  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
     if (error) return res.status(500).json({ error: 'Could not fetch video.' });
     try {
       const info = JSON.parse(stdout);
