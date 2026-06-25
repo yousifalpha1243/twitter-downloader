@@ -55,9 +55,8 @@ app.get('/info', (req, res) => {
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   exec(`${YT_DLP_PATH} ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
     if (error) {
-  return res.status(500).json({
-    error: error.message
-  });
+  console.log("FULL ERROR:", error);
+  return res.status(500).send(String(error));
 }
     try {
       const info = JSON.parse(stdout);
