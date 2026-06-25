@@ -1,20 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const https = require('https');
-const http = require('http');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Tweet ID nikalta hai URL se
 function getTweetId(url) {
   const match = url.match(/status\/(\d+)/);
   return match ? match[1] : null;
 }
 
-// Twitter se video info laata hai
 function fetchTweetData(tweetId) {
   return new Promise((resolve, reject) => {
     const apiUrl = `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en&token=x`;
@@ -34,7 +31,6 @@ function fetchTweetData(tweetId) {
   });
 }
 
-// /info route
 app.get('/info', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
@@ -44,7 +40,6 @@ app.get('/info', async (req, res) => {
 
   try {
     const data = await fetchTweetData(tweetId);
-
     let qualities = [];
     let thumbnail = '';
 
@@ -80,23 +75,60 @@ app.get('/info', async (req, res) => {
   }
 });
 
-// /video route — seedha Twitter se download
-app.get('/video', async (req, res) => {
+app.get('/video', (req, res) => {
   const format = req.query.format;
   if (!format) return res.status(400).send('No format');
+  res.json({ status: 'processing', file: 'tw_' + format });
+});
 
-  const videoUrl = decodeURIComponent(format);
-  res.setHeader('Content-Disposition', 'attachment; filename="video.mp4"');
-  res.setHeader('Content-Type', 'video/mp4');
+app.get('/status', (req, res) => {
+  const file = req.query.file;
+  if (file && file.startsWith('tw_')) {
+    res.json({ ready: true, url: '/file/' + file });
+  } else {
+    res.json({ ready: false });
+  }
+});
 
-  https.get(videoUrl, {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  }, (stream) => {
-    stream.pipe(res);
-  }).on('error', (e) => {
-    console.error(e);
-    res.status(500).send('Download failed');
-  });
+app.get('/file/:filename', (req, res) => {
+  const filename = req.params.filename;
+  if (filename.startsWith('tw_')) {
+    const videoUrl = decodeURIComponent(filename.slice(3));
+    res.redirect(videoUrl);
+  } else {
+    res.status(404).send('Not found');
+  }
+});
+
+app.get('/mp3', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send('No URL');
+  const tweetId = getTweetId(url);
+  if (!tweetId) return res.status(400).json({ error: 'Invalid URL' });
+
+  try {
+    const data = await fetchTweetData(tweetId);
+    if (data.mediaDetails && data.mediaDetails[0] && data.mediaDetails[0].video_info) {
+      const variants = data.mediaDetails[0].video_info.variants
+        .sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0));
+      const audioUrl = variants[0].url;
+      res.json({ status: 'processing', file: 'tw_' + encodeURIComponent(audioUrl) });
+    } else {
+      res.status(500).json({ error: 'No audio found' });
+    }
+  } catch(e) {
+    res.status(500).json({ error: 'Could not fetch audio' });
+  }
+});
+
+app.get('/mp3file/:filename', (req, res) => {
+  const filename = req.params.filename;
+  if (filename.startsWith('tw_')) {
+    const videoUrl = decodeURIComponent(filename.slice(3));
+    res.redirect(videoUrl);
+  } else {
+    res.status(404).send('Not found');
+  }
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
