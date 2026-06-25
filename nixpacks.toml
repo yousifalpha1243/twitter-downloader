@@ -1,5 +1,2 @@
 [phases.setup]
 nixPkgs = ["yt-dlp"]
-
-[start]
-cmd = "node server.js"
