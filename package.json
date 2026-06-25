@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "python3 -m pip install yt-dlp || true"
   },
   "dependencies": {
     "axios": "^1.0.0",
