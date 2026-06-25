@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Twitter Video Downloader</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#1a6b1a; font-family:Arial; min-height:100vh; display:flex; align-items:center; justify-content:center; }
+        .main { background:white; width:750px; border-radius:10px; padding:30px; text-align:center; }
+        h1 { color:#1d9bf0; font-size:1.8rem; margin-bottom:5px; }
+        p.sub { color:#888; margin-bottom:20px; font-size:0.95rem; }
+        .row { display:flex; gap:10px; margin:20px 0; }
+        input { flex:1; padding:14px; border-radius:8px; border:2px solid #1d9bf0; font-size:1rem; color:#333; }
+        .search-btn { padding:14px 25px; background:#1d9bf0; color:white; border:none; border-radius:8px; font-size:1rem; cursor:pointer; font-weight:bold; }
+        #result { display:none; margin-top:20px; }
+        .thumb { width:100%; border-radius:8px; margin-bottom:15px; max-height:300px; object-fit:cover; }
+        .video-title { font-size:1rem; color:#333; margin-bottom:15px; font-weight:bold; }
+        .dl-btn { display:block; width:100%; padding:18px; background:#29a8e0; color:black; font-weight:bold; border-radius:8px; font-size:1rem; text-decoration:none; margin-bottom:8px; cursor:pointer; text-align:center; border:none; }
+        .dl-btn:hover { background:#1d9bf0; color:white; }
+        .mp3-btn { display:block; width:100%; padding:18px; background:#29a8e0; color:black; font-weight:bold; border-radius:8px; font-size:1rem; text-decoration:none; margin-bottom:8px; cursor:pointer; text-align:center; border:none; }
+        .mp3-btn:hover { background:#1d9bf0; color:white; }
+        .progress { background:#f0f0f0; border-radius:8px; padding:15px; margin-top:10px; color:#555; }
+    </style>
+</head>
+<body>
+    <div class="main">
+        <h1>🐦 Twitter Video Downloader</h1>
+        <p class="sub">Download Twitter/X videos in HD, 720p, 360p or MP3 for free!</p>
+        <div class="row">
+            <input id="url" type="text" placeholder="Paste Twitter/X video URL here...">
+            <button class="search-btn" id="btn">Download</button>
+        </div>
+        <div id="result"></div>
+    </div>
+    <script>
+        var currentUrl = '';
+
+        document.getElementById('btn').addEventListener('click', function() {
+            var url = document.getElementById('url').value.trim();
+            if (!url) return alert('URL daalo!');
+            currentUrl = url;
+            var r = document.getElementById('result');
+            r.style.display = 'block';
+            r.innerHTML = '<div class="progress">⏳ Loading qualities... please wait...</div>';
+
+            fetch('/info?url=' + encodeURIComponent(url))
+            .then(function(res) { return res.json(); })
+            .then(function(d) {
+                if (d.error) { r.innerHTML = '<p style="color:red">❌ ' + d.error + '</p>'; return; }
+                var h = '';
+                if (d.thumbnail) h += '<img class="thumb" src="' + d.thumbnail + '">';
+                if (d.title) h += '<p class="video-title">' + d.title + '</p>';
+                if (d.qualities && d.qualities.length > 0) {
+                    d.qualities.forEach(function(q, i) {
+                        var label = i === 0 ? '📥 Download HD ' + q.quality + ' ⭐' : '📥 Download ' + q.quality;
+                        if (q.filesize) label += ' (' + q.filesize + ')';
+                        h += '<button class="dl-btn" onclick="startDownload(\'' + encodeURIComponent(currentUrl) + '\',\'' + q.format_id + '\',\'video\')">' + label + '</button>';
+                    });
+                }
+                h += '<button class="mp3-btn" onclick="startDownload(\'' + encodeURIComponent(currentUrl) + '\',\'\',\'mp3\')">🎵 Convert to MP3</button>';
+                h += '<div id="dlstatus"></div>';
+                r.innerHTML = h;
+            })
+            .catch(function(e) {
+                r.innerHTML = '<p style="color:red">❌ Error: ' + e.message + '</p>';
+            });
+        });
+
+        function startDownload(encodedUrl, format, type) {
+            var status = document.getElementById('dlstatus');
+            status.innerHTML = '<div class="progress">⏳ Downloading... please wait...</div>';
+            var endpoint = type === 'mp3' ? '/mp3?url=' + encodedUrl : '/video?url=' + encodedUrl + '&format=' + format;
+            fetch(endpoint)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.file) { status.innerHTML = '<p style="color:red">❌ Error!</p>'; return; }
+                checkReady(d.file, type, status);
+            });
+        }
+
+        function checkReady(file, type, status) {
+            fetch('/status?file=' + file)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.ready) {
+                    status.innerHTML = '<div class="progress">✅ Ready! <a href="' + d.url + '" style="color:#1d9bf0;font-weight:bold">Click here to Download</a></div>';
+                } else {
+                    status.innerHTML = '<div class="progress">⏳ Still processing...</div>';
+                    setTimeout(function() { checkReady(file, type, status); }, 2000);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
