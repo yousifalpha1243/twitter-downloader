@@ -1,29 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-const { exec, execSync } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const app = express();
-
-// yt-dlp install karo agar nahi hai
-try {
-  execSync('yt-dlp --version', { stdio: 'ignore' });
-  console.log('yt-dlp already installed');
-} catch(e) {
-  console.log('Installing yt-dlp...');
-  try {
-    execSync('pip install yt-dlp', { stdio: 'inherit' });
-    console.log('yt-dlp installed!');
-  } catch(e2) {
-    console.log('pip failed, trying pip3...');
-    try {
-      execSync('pip3 install yt-dlp', { stdio: 'inherit' });
-    } catch(e3) {
-      console.log('Trying curl install...');
-      execSync('curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp', { stdio: 'inherit' });
-    }
-  }
-}
 
 const COOKIES = path.join(__dirname, 'cookies.txt');
 const TEMP = path.join(__dirname, 'temp');
@@ -36,10 +16,8 @@ app.use(express.static('public'));
 app.get('/info', (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
-  
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
-  
-  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 30000 }, (error, stdout) => {
+  exec(`yt-dlp ${cookieFlag} --dump-json "${url}"`, { timeout: 60000 }, (error, stdout) => {
     if (error) return res.status(500).json({ error: 'Could not fetch video.' });
     try {
       const info = JSON.parse(stdout);
@@ -74,11 +52,9 @@ app.get('/video', (req, res) => {
   const url = req.query.url;
   const format = req.query.format || 'best';
   if (!url) return res.status(400).send('No URL');
-
   const filename = 'video_' + Date.now() + '.mp4';
   const filepath = path.join(TEMP, filename);
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
-
   res.json({ status: 'processing', file: filename });
   exec(`yt-dlp ${cookieFlag} -f ${format} -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
     if (error) console.error('Download error:', error);
@@ -122,4 +98,4 @@ app.get('/mp3file/:filename', (req, res) => {
   res.sendFile(filepath);
 });
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
