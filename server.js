@@ -1,47 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
+const YTDlpWrap = require('yt-dlp-wrap').default;
 const app = express();
 
-const YT_DLP_PATH = '/app/yt-dlp';
-
-function installYtDlp(callback) {
-  if (fs.existsSync(YT_DLP_PATH)) {
-    console.log('yt-dlp already exists');
-    return callback();
-  }
-  console.log('Downloading yt-dlp...');
-  const file = fs.createWriteStream(YT_DLP_PATH);
-  https.get('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp', function(response) {
-    if (response.statusCode === 302 || response.statusCode === 301) {
-      https.get(response.headers.location, function(res2) {
-        res2.pipe(file);
-        file.on('finish', function() {
-          file.close();
-          execSync(`chmod +x ${YT_DLP_PATH}`);
-          console.log('yt-dlp downloaded!');
-          callback();
-        });
-      });
-    } else {
-      response.pipe(file);
-      file.on('finish', function() {
-        file.close();
-        execSync(`chmod +x ${YT_DLP_PATH}`);
-        console.log('yt-dlp downloaded!');
-        callback();
-      });
-    }
-  }).on('error', function(err) {
-    console.error('Download failed:', err.message);
-    callback();
-  });
-}
-
-const COOKIES = path.join(__dirname, 'cookies.txt');
 const TEMP = path.join(__dirname, 'temp');
 if (!fs.existsSync(TEMP)) fs.mkdirSync(TEMP);
 
@@ -49,52 +12,51 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get('/info', (req, res) => {
+const ytDlpWrap = new YTDlpWrap();
+
+app.get('/info', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: 'URL required' });
-  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
-  exec(`${YT_DLP_PATH} ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
-    if (error) return res.status(500).json({ error: 'Could not fetch video.' });
-    try {
-      const info = JSON.parse(stdout);
-      const qualities = [];
-      const seen = new Set();
-      if (info.formats) {
-        info.formats.forEach(f => {
-          if (f.height && !seen.has(f.height)) {
-            seen.add(f.height);
-            qualities.push({
-              quality: f.height + 'p',
-              height: f.height,
-              format_id: f.format_id,
-              filesize: f.filesize ? Math.round(f.filesize/1024/1024) + ' MB' : ''
-            });
-          }
-        });
-      }
-      qualities.sort((a, b) => b.height - a.height);
-      res.json({
-        title: info.title,
-        thumbnail: info.thumbnail,
-        qualities: qualities.length > 0 ? qualities : [{ quality: 'Default', format_id: 'best', filesize: '' }]
+  try {
+    const info = await ytDlpWrap.getVideoInfo(url);
+    const qualities = [];
+    const seen = new Set();
+    if (info.formats) {
+      info.formats.forEach(f => {
+        if (f.height && !seen.has(f.height)) {
+          seen.add(f.height);
+          qualities.push({
+            quality: f.height + 'p',
+            height: f.height,
+            format_id: f.format_id,
+            filesize: f.filesize ? Math.round(f.filesize/1024/1024) + ' MB' : ''
+          });
+        }
       });
-    } catch(e) {
-      res.status(500).json({ error: 'Parse error' });
     }
-  });
+    qualities.sort((a, b) => b.height - a.height);
+    res.json({
+      title: info.title,
+      thumbnail: info.thumbnail,
+      qualities: qualities.length > 0 ? qualities : [{ quality: 'Default', format_id: 'best', filesize: '' }]
+    });
+  } catch(e) {
+    res.status(500).json({ error: 'Could not fetch video.' });
+  }
 });
 
-app.get('/video', (req, res) => {
+app.get('/video', async (req, res) => {
   const url = req.query.url;
   const format = req.query.format || 'best';
   if (!url) return res.status(400).send('No URL');
   const filename = 'video_' + Date.now() + '.mp4';
   const filepath = path.join(TEMP, filename);
-  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-  exec(`${YT_DLP_PATH} ${cookieFlag} -f ${format} -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
-    if (error) console.error('Download error:', error);
-  });
+  try {
+    await ytDlpWrap.execPromise([url, '-f', format, '-o', filepath]);
+  } catch(e) {
+    console.error('Download error:', e);
+  }
 });
 
 app.get('/status', (req, res) => {
@@ -115,16 +77,17 @@ app.get('/file/:filename', (req, res) => {
   setTimeout(() => { try { fs.unlinkSync(filepath); } catch(e) {} }, 60000);
 });
 
-app.get('/mp3', (req, res) => {
+app.get('/mp3', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).send('No URL');
   const filename = 'audio_' + Date.now() + '.mp3';
   const filepath = path.join(TEMP, filename);
-  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   res.json({ status: 'processing', file: filename });
-  exec(`${YT_DLP_PATH} ${cookieFlag} -f bestaudio -o "${filepath}" "${url}"`, { timeout: 120000 }, (error) => {
-    if (error) console.error('MP3 error:', error);
-  });
+  try {
+    await ytDlpWrap.execPromise([url, '-f', 'bestaudio', '-o', filepath]);
+  } catch(e) {
+    console.error('MP3 error:', e);
+  }
 });
 
 app.get('/mp3file/:filename', (req, res) => {
@@ -134,6 +97,4 @@ app.get('/mp3file/:filename', (req, res) => {
   res.sendFile(filepath);
 });
 
-installYtDlp(function() {
-  app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
-});
+app.listen(process.env.PORT || 3000, () => console.log('Server running!'));
