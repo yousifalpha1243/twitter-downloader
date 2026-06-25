@@ -54,7 +54,11 @@ app.get('/info', (req, res) => {
   if (!url) return res.status(400).json({ error: 'URL required' });
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
   exec(`${YT_DLP_PATH} ${cookieFlag} --dump-json "${url}"`, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
-    if (error) return res.status(500).json({ error: 'Could not fetch video.' });
+    if (error) {
+  return res.status(500).json({
+    error: error.message
+  });
+}
     try {
       const info = JSON.parse(stdout);
       const qualities = [];
