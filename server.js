@@ -79,6 +79,7 @@ app.get('/status', (req, res) => {
 // PROXY - server se download karega
 app.get('/proxy', (req, res) => {
   const v = req.query.v;
+  console.log("Proxy URL:", v);
   if (!v) return res.status(400).send('No URL');
   const videoUrl = decodeURIComponent(v);
   
