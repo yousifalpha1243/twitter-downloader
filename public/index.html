@@ -36,18 +36,37 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "X Video Downloader",
-  "url": "https://www.irandefenceforc.com/",
-  "description": "Download X (Twitter) videos online in HD quality for free.",
-  "publisher": {
-    "@type": "Organization",
-    "name": "X Video Downloader",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "https://www.irandefenceforc.com/logo.png"
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "name": "X Video Downloader",
+      "url": "https://www.irandefenceforc.com/",
+      "description": "Download X (Twitter) videos in HD quality for free.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.irandefenceforc.com/?url={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "Organization",
+      "name": "X Video Downloader",
+      "url": "https://www.irandefenceforc.com/",
+      "logo": "https://www.irandefenceforc.com/logo.png"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "X Video Downloader",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "url": "https://www.irandefenceforc.com/"
     }
-  }
+  ]
 }
 </script>
 <link rel="icon" href="/favicon.png">
