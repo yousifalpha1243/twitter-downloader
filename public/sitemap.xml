@@ -55,6 +55,10 @@
   <changefreq>monthly</changefreq>
   <priority>0.7</priority>
 </url>
-
+<url>
+  <loc>https://www.irandefenceforc.com/blog/twitter-video-downloader-for-android.html</loc>
+  <changefreq>monthly</changefreq>
+  <priority>0.7</priority>
+</url>
 
 </urlset>
